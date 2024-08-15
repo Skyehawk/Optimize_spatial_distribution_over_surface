@@ -1,6 +1,8 @@
-# Spatial_distribution_optimize.py
+# Spatial_optimizer.py
 
 # Typing stuff to expidite some heavily looping code
+# Handle some function loading stuff for the optimizer
+from functools import partial
 from typing import List, Tuple
 
 # Base imports
@@ -35,7 +37,7 @@ def generate_surface(map_size=100):
     The resultant test data somewhat mimics real-world terrain.
 
     Keyword arguments:
-    map_size -- Int - size of the x and y dimension of the test data
+    map_size -- Int - (defaut 100) size of the x and y dimension of the test data
     """
 
     # Generate structured surface data coordinates, named xx & yy by convention
@@ -100,14 +102,14 @@ def get_visible_area_3d_poly(
     calculated by sweeping a 0 degrees elevation (i.e. laser level approach)
 
     Arguments:
-    surface        -- Numpy ndarray - surface surface, 2d array of elevation values
+    surface    -- Numpy ndarray - surface surface, 2d array of elevation values
     obs_x      -- Float - x coordinate in surface crds
     obs_y      -- Float - y coordinate in surface crds
     obs_height -- Float - additional "tower" height above the surface at (obs_x, obs_y)
-    max_radius -- Float - maximum distance a ray is cast, whereafter the max radius will be assumed
+    max_radius -- Float - maximum distance a transect (ray) is cast, whereafter the max radius will be assumed
 
     Keyword Arguments:
-    num_transects -- Int -- default=90, number of instances to be checked, divided over 360 degrees
+    num_transects -- Int -- (default 90) number of instances to be checked, divided over 360 degrees
     """
 
     polygon_points = []
@@ -168,7 +170,7 @@ def callback(intermediate_result):
     for progrss and visulization, not necessary for core functionality.
 
     Arguments:
-    intermediate_result -- Scipy.optimize.OptimizeResult - from differential_evolution
+    intermediate_result -- Scipy.optimize.OptimizeResult - supplied by differential_evolution
     """
     # Extract current best solution coordinates to a listkl:w
 
@@ -199,12 +201,10 @@ def callback(intermediate_result):
 def objective(
     params,
     surface,
-    obs_height,
-    max_radius,
-    num_transects,
     valid_mask,
     fixed_points,
-    method,
+    method="3d_poly",
+    **kwargs,
 ):
     """
     Return the score of the current solution. Used as the fitness function for
@@ -217,13 +217,13 @@ def objective(
     params        -- Numpy ndarray - A 1D array containing the x and y coordinates of
                      the points being optimized as determined by differential_evolution,
                      THIS IS SUPPLIED BY differential_evolution (initially derived ferom bounds)
-    surface           -- Numpy ndarray - 2d float array of surface elevation
-    obs_height    -- Float - height above the surface to evaluate points at, applies to fixed and optimized points
-    max_radius    -- Float - Maximum distance to search for obstrictions
-    num_transects -- Int - Number of transects (rays) to use when evaluating surface for obstrictions
-    valid_mask    -- Numpy ndarray - 2d boolean array of the valid_mask cost surface
+    surface       -- Numpy ndarray - 2d float array of surface elevation
+    valid_mask    -- Numpy ndarray  - 2d boolean array of the valid_mask cost surface
     fixed_points  -- List(List(float,float)) - coordinate pairs of fixed observation points not allowed to change
-    method        -- String - User defined method for calculating the visible area (e.g. "3d_poly")
+    **kwargs      -- Additional arguments passed to through the fitness function (objective) to get_visible_area_3d_poly()
+
+    Keyword Arguments:
+    method        -- String - (default 3d_poly) User defined function for calculating the visible area
     """
     points = params.reshape(
         -1, 2
@@ -235,13 +235,13 @@ def objective(
     all_points = np.vstack((points, fixed_points))
 
     for i, (obs_x, obs_y) in enumerate(all_points):
-        # Ensure indices are within bounds and convert to integer
+        # Ensure indices are within bounds and convert to integer (for speed)
         obs_x = int(np.clip(obs_x, 0, surface.shape[1] - 1))
         obs_y = int(np.clip(obs_y, 0, surface.shape[0] - 1))
 
         # Only check validity for observation points
         if i < len(points):
-            # Check if the point is in a valid area
+            # Check if the point is in a valid area, if this were a continious cost surface this check would need to change
             if valid_mask[obs_x, obs_y] == 0:
                 penalty += 1000  # Add large penalty for invalid point, this can be modified for a continious cost surface (not binary/thresholded)
 
@@ -250,9 +250,10 @@ def objective(
                 surface=surface,
                 obs_x=obs_x,
                 obs_y=obs_y,
-                obs_height=obs_height,
-                max_radius=max_radius,
-                num_transects=num_transects,
+                **kwargs,
+                # obs_height=kwargs.get("obs_height"),
+                # max_radius=kwargs.get("max_radius"),
+                # num_transects=kwargs.get("num_transects"),
             )
         else:
             raise ValueError(
@@ -266,7 +267,7 @@ def objective(
         visible_area_polys.append(visible_area)
 
     if visible_area_polys:
-        # Calculate total visible area (map coverage) if we have any visible areas (we should)
+        # Calculate total visible area (map coverage) if visible_area_polys is not empty
         map_coverage = (gpd.GeoSeries(unary_union(visible_area_polys)).area).iloc[
             0
         ] / np.prod(surface.shape)
@@ -278,16 +279,13 @@ def objective(
     )  # Return negative to minimize negative coverage (uncovered areas), penalize invalid points
 
 
-# Optimization driver function using scipy.optimize.differential_evolution & .scipy.optimize.minimum
 def visibility_optimized_points_3d(
     surface,
     valid_mask,
     n_points,
     method,
-    obs_height,
-    max_radius,
-    num_transects,
     fixed_points,
+    **kwargs,
 ):
     """
     Return:
@@ -297,15 +295,12 @@ def visibility_optimized_points_3d(
     fixed_polygons       -- List(ShapelyPolygon) - Same as observation_polygons, but for fixed points
 
     Arguments:
-    surface --
-    valid_mask --
-    n_points --
-    method --
-    obs_height --
-    max_radius --
-    num_transects --
-    fixed_points --
-
+    n_points             -- Int - Number of points to place/ optimize
+    surface              -- Numpy ndarray - 2d float array of surface elevation
+    valid_mask           -- Numpy ndarray  - 2d boolean array of the valid_mask cost surface
+    method               -- String - User defined method for calculating the visible area (e.g. "3d_poly")
+    fixed_points         -- List(List(float,float)) - coordinate pairs of fixed observation points not allowed to change
+    **kwargs             -- Additional arguments passed to through the fitness function (objective) to get_visible_area_3d_poly()
     """
 
     surface_height, surface_width = (
@@ -321,19 +316,22 @@ def visibility_optimized_points_3d(
     # Some plotting stuff - persistent figure and update in the window inplace (mpl interacive mode) to see the optimization in real-time
     plt.ion()  # interactive mode to make updating the plot in a singular window possible
 
+    # Create a partial function to include fixed arguments and keyword args
+    # that differential evolution can use, this allows us to pass **kwargs
+    # in differential_evolution(), which has a strict args=(...) pattern,
+    objective_with_args = partial(
+        objective,
+        surface=surface,
+        valid_mask=valid_mask,
+        fixed_points=fixed_points,
+        method=method,
+        **kwargs,
+    )
+
     # Begin the differential evolution
     result = differential_evolution(
-        objective,
+        objective_with_args,
         bounds,
-        args=(
-            surface,
-            obs_height,
-            max_radius,
-            num_transects,
-            valid_mask,
-            fixed_points,
-            method,
-        ),
         init="halton",  # Several options avalible including: 'latinhypercube' (efficent) & 'sobol' (accurate)
         strategy="best1bin",  # Several options avalible. 'best1bin' is sufficent for most optimization
         maxiter=1000,  # Maximum number of iterations before ending
@@ -343,7 +341,7 @@ def visibility_optimized_points_3d(
         workers=6,  # CPU cores to use
         updating="deferred",  # If "intermediate" - able to check for better solution within generation, "deferred" necessary if multiple worrkers
         disp=True,  # return feedback on state of optimizer as it is running (iteration and score)
-        callback=callback,  # callback function (above) for live updates as the optimizer runs
+        callback=callback,  # (optional) callback function (above) for live updates as the optimizer runs
     )
 
     plt.ioff()  # Turn off interactive mode when done
@@ -356,13 +354,14 @@ def visibility_optimized_points_3d(
 
     if method == "3d_poly":  # Use simplified (efficent) view area polygon approximaiton
         for obs_x, obs_y in observation_points:
-            obs_visible_area = get_visible_area_3d_poly(
-                surface, obs_x, obs_y, obs_height, max_radius, num_transects
-            )
+            obs_visible_area = get_visible_area_3d_poly(surface, obs_x, obs_y, **kwargs)
             observation_polygons.append(obs_visible_area)
         for fix_x, fix_y in fixed_points:
             fix_visible_area = get_visible_area_3d_poly(
-                surface, fix_x, fix_y, obs_height, max_radius, num_transects
+                surface,
+                fix_x,
+                fix_y,
+                **kwargs,  # kwargs.get('obs_height'), kwargs.get('max_radius'), kwargs.get('num_transects')
             )
             fixed_polygons.append(fix_visible_area)
     else:
@@ -385,27 +384,30 @@ if __name__ == "__main__":
 
     fig_op, ax_op = plt.subplots(
         1, 1, figsize=(8, 6)
-    )  # figure and axis we will be updating
+    )  # figure and axis we will be updating to visulize the optimization in progress
 
     n_points = 3  # Int: number of new observation points to place to increase coverage
-    obs_height = 10  # Float or Int: Height of transmitter/ sensor - in map units, for ALL towers (including pre existing)
-    obs_max_radius = 35  # Float or Int: Maximum transmission/view distance from tower
-    n_transects = 90  # Int: Number of rays (transects) cast to generate polygon - complex terrain at distance will require more rays, defaut 90 (4 degrees between rays)
-    method = "3d_poly"  # Two options: '3d_poly' (faster by about 8x) and  <removed for brevity>'3d_poly_with_obstructions' (more accurate, especially in complex terrain)
+    polygon_method = "3d_poly"  # Two options: '3d_poly' (faster by about 8x) and  <removed for brevity>'3d_poly_with_obstructions' (more accurate, especially in complex terrain)
+    pt_height = 10  # Float or Int: Height of transmitter/ sensor - in map units, for ALL towers (including pre existing)
+    pt_max_radius = 35  # Float or Int: Maximum transmission/view distance from tower
+    pt_n_transects = 90  # Int: Number of rays (transects) cast to generate polygon - complex terrain at distance will require more rays, defaut 90 (4 degrees between rays). This can roughly be considered analogous to camera resolution
 
     obs_pts = visibility_optimized_points_3d(
         surface=dem,
         valid_mask=valid_mask,
         n_points=n_points,
-        method=method,
-        obs_height=obs_height,
-        max_radius=obs_max_radius,
-        num_transects=n_transects,
         fixed_points=fixed_points,
+        method=polygon_method,
+        # Additional kwargs to pass to the spatial evaluation.
+        # These should ultimatly be part of a class with properties if any more complex than ~3 parameters
+        obs_height=pt_height,
+        max_radius=pt_max_radius,
+        num_transects=pt_n_transects,
     )
     observation_points, fixed_points, observation_polygons, fixed_polygons = obs_pts
     print(observation_points)
 
+    # display final plot with optimized points and coverage polygons
     fig, ax = plt.subplots(1, 1, figsize=(8, 6))
     plot_observation_points_with_polygons_3d(
         surface=dem,
@@ -417,5 +419,5 @@ if __name__ == "__main__":
         ax=ax,
     )
 
-    plt.show()  # display final plot with optimized points and coverage polygons
+    plt.show()
 # EOF
