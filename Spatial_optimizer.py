@@ -163,39 +163,65 @@ def get_visible_area_3d_poly(
     return polygon
 
 
-# Callback function for visulizing the results as the optimization progresses
-def callback(intermediate_result):
+def create_callback(kwargs):
     """
-    Plot the current best solution of the optimizer thus far. Callback is purely
-    for progrss and visulization, not necessary for core functionality.
-
-    Arguments:
-    intermediate_result -- Scipy.optimize.OptimizeResult - supplied by differential_evolution
+    Returns a callback function with access to the kwargs via closure
     """
-    # Extract current best solution coordinates to a listkl:w
 
-    current_solution = intermediate_result.x
-    current_solution = [
-        (int(current_solution[i]), int(current_solution[i + 1]))
-        for i in range(0, len(current_solution), 2)  # Step through coordinate pairs
-    ]
+    def callback(intermediate_result):
+        """
+        Plot the current best solution of the optimizer thus far. Callback is purely
+        for progrss and visulization, not necessary for core functionality.
 
-    # Clear previous plot so we see an "updating" plot
-    clear_output(wait=True)
+        Arguments:
+        intermediate_result -- Scipy.optimize.OptimizeResult - supplied by differential_evolution
+        """
+        # Extract current best solution coordinates to a listkl:w
 
-    # Plot the current solution
-    plot_observation_points_with_polygons_3d(
-        surface=dem,
-        valid_mask=valid_mask,
-        observation_points=current_solution,
-        fixed_points=fixed_points,
-        observation_polygons=[],  # observation_polygons,   #pass an empty list if you don't want to plot the polys when optimizing
-        fixed_polygons=[],  # fixed_polygons,
-        annotation=f"{current_solution}\ndifferential_evolution: f(x){intermediate_result.fun}",
-        ax=ax_op,
-    )
+        current_solution = intermediate_result.x
+        current_solution = [
+            (int(current_solution[i]), int(current_solution[i + 1]))
+            for i in range(0, len(current_solution), 2)  # Step through coordinate pairs
+        ]
 
-    plt.pause(0.1)  # Pause to allow the plot to update
+        observation_polygons = []
+        fixed_polygons = []
+
+        # if method == "3d_poly":  # Use simplified (efficent) view area polygon approximaton
+        for obs_x, obs_y in current_solution:
+            obs_visible_area = get_visible_area_3d_poly(dem, obs_x, obs_y, **kwargs)
+            observation_polygons.append(obs_visible_area)
+        for fix_x, fix_y in fixed_points:
+            fix_visible_area = get_visible_area_3d_poly(
+                dem,
+                fix_x,
+                fix_y,
+                **kwargs,  # kwargs.get('obs_height'), kwargs.get('max_radius'), kwargs.get('num_transects')
+            )
+            fixed_polygons.append(fix_visible_area)
+        # else:
+        #    raise ValueError(
+        #        "Invalid method specified. Must be one of: '3d_poly','3d_poly_with_obstructions'"
+        #    )
+
+        # Clear previous plot so we see an "updating" plot
+        clear_output(wait=True)
+
+        # Plot the current solution
+        plot_observation_points_with_polygons_3d(
+            surface=dem,
+            valid_mask=valid_mask,
+            observation_points=current_solution,
+            fixed_points=fixed_points,
+            observation_polygons=observation_polygons,  # pass an empty list if you don't want to plot the polys when optimizing
+            fixed_polygons=fixed_polygons,
+            annotation=f"{current_solution}\ndifferential_evolution: f(x){intermediate_result.fun}",
+            ax=ax_op,
+        )
+
+        plt.pause(0.1)  # Pause to allow the plot to update
+
+    return callback
 
 
 def objective(
@@ -251,9 +277,6 @@ def objective(
                 obs_x=obs_x,
                 obs_y=obs_y,
                 **kwargs,
-                # obs_height=kwargs.get("obs_height"),
-                # max_radius=kwargs.get("max_radius"),
-                # num_transects=kwargs.get("num_transects"),
             )
         else:
             raise ValueError(
@@ -328,6 +351,9 @@ def visibility_optimized_points_3d(
         **kwargs,
     )
 
+    # Create a callback function w/ access to the kwargs since by default the callback is VERY limited
+    callback_with_kwargs = create_callback(kwargs)
+
     # Begin the differential evolution
     result = differential_evolution(
         objective_with_args,
@@ -341,7 +367,7 @@ def visibility_optimized_points_3d(
         workers=6,  # CPU cores to use
         updating="deferred",  # If "intermediate" - able to check for better solution within generation, "deferred" necessary if multiple worrkers
         disp=True,  # return feedback on state of optimizer as it is running (iteration and score)
-        callback=callback,  # (optional) callback function (above) for live updates as the optimizer runs
+        callback=callback_with_kwargs,  # (optional) callback function (above) for live updates as the optimizer runs
     )
 
     plt.ioff()  # Turn off interactive mode when done
