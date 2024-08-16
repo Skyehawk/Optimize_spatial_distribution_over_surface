@@ -1,24 +1,19 @@
 # Spatial_optimizer.py
 
-# Typing stuff to expidite some heavily looping code
 # Handle some function loading stuff for the optimizer
 from functools import partial
-from typing import List, Tuple
 
 # Base imports
 import geopandas as gpd  # v 0.14.4
-import ipywidgets as widgets
 import matplotlib.pyplot as plt  # Visulization - v 3.8.4
 import numpy as np  # Array manipulation - v 1.26.4
-import plotly.graph_objects as go
 
 # Visulization libs outside of mpl
-from IPython.display import HTML, clear_output, display
-from ipywidgets import interact
+from IPython.display import clear_output
 
 # Scipy imports for spatial optimization
 from scipy.ndimage import gaussian_filter  # Smoothing - v 1.13.0
-from scipy.optimize import differential_evolution, minimize  # v 1.13.0
+from scipy.optimize import differential_evolution  # v 1.13.0
 
 # Shapely imports for polygon handling and unions
 from shapely.geometry import Polygon as ShapelyPolygon
@@ -97,7 +92,7 @@ def get_visible_area_3d_poly(
     surface, obs_x, obs_y, obs_height, max_radius, num_transects=90
 ):
     """
-    Return a Shaply polygon based on a raytracing approach.
+    Return a Shaply polygon based on a raytracing approach from an observation point.
     Polygon in based on num_transects and a max distance. line of sight is
     calculated by sweeping a 0 degrees elevation (i.e. laser level approach)
 
@@ -163,7 +158,7 @@ def get_visible_area_3d_poly(
     return polygon
 
 
-def create_callback(kwargs):
+def create_callback(method, kwargs):
     """
     Returns a callback function with access to the kwargs via closure
     """
@@ -187,22 +182,24 @@ def create_callback(kwargs):
         observation_polygons = []
         fixed_polygons = []
 
-        # if method == "3d_poly":  # Use simplified (efficent) view area polygon approximaton
-        for obs_x, obs_y in current_solution:
-            obs_visible_area = get_visible_area_3d_poly(dem, obs_x, obs_y, **kwargs)
-            observation_polygons.append(obs_visible_area)
-        for fix_x, fix_y in fixed_points:
-            fix_visible_area = get_visible_area_3d_poly(
-                dem,
-                fix_x,
-                fix_y,
-                **kwargs,  # kwargs.get('obs_height'), kwargs.get('max_radius'), kwargs.get('num_transects')
+        if (
+            method == "3d_poly"
+        ):  # Use simplified (efficent) view area polygon approximaton
+            for obs_x, obs_y in current_solution:
+                obs_visible_area = get_visible_area_3d_poly(dem, obs_x, obs_y, **kwargs)
+                observation_polygons.append(obs_visible_area)
+            for fix_x, fix_y in fixed_points:
+                fix_visible_area = get_visible_area_3d_poly(
+                    dem,
+                    fix_x,
+                    fix_y,
+                    **kwargs,  # kwargs.get('obs_height'), kwargs.get('max_radius'), kwargs.get('num_transects')
+                )
+                fixed_polygons.append(fix_visible_area)
+        else:
+            raise ValueError(
+                "Invalid method specified. Must be one of: '3d_poly','3d_poly_with_obstructions'"
             )
-            fixed_polygons.append(fix_visible_area)
-        # else:
-        #    raise ValueError(
-        #        "Invalid method specified. Must be one of: '3d_poly','3d_poly_with_obstructions'"
-        #    )
 
         # Clear previous plot so we see an "updating" plot
         clear_output(wait=True)
@@ -283,7 +280,7 @@ def objective(
                 "Invalid method specified, methods trimmed for example code. Must be one of: '3d_poly'"
             )
 
-        # Handle potential invalid shapely geometries from our visibility functions
+        # Handle potential invalid shapely geometries from our visibility functions, buffer helps resolve
         if not visible_area.is_valid:
             visible_area = visible_area.buffer(0)
 
@@ -352,7 +349,7 @@ def visibility_optimized_points_3d(
     )
 
     # Create a callback function w/ access to the kwargs since by default the callback is VERY limited
-    callback_with_kwargs = create_callback(kwargs)
+    callback_with_kwargs = create_callback(method, kwargs)
 
     # Begin the differential evolution
     result = differential_evolution(
@@ -366,7 +363,7 @@ def visibility_optimized_points_3d(
         polish=True,  # Default true - polish with scipy.minimize
         workers=6,  # CPU cores to use
         updating="deferred",  # If "intermediate" - able to check for better solution within generation, "deferred" necessary if multiple worrkers
-        disp=True,  # return feedback on state of optimizer as it is running (iteration and score)
+        disp=True,  # return feedback on state of optimizer on terninal as it is running (iteration and score)
         callback=callback_with_kwargs,  # (optional) callback function (above) for live updates as the optimizer runs
     )
 
@@ -403,7 +400,7 @@ if __name__ == "__main__":
     dem, valid_mask, x, y = generate_surface(dem_size)
     plot_generated_surface(dem, valid_mask)
 
-    # Fixed points that we will optimize around
+    # Fixed points that we will optimize other points, fixed points do not move
     fixed_points = np.array(
         [[40, 30], [85, 70]]
     )  # locations of pre-existing points (crds in float or int)
@@ -412,10 +409,10 @@ if __name__ == "__main__":
         1, 1, figsize=(8, 6)
     )  # figure and axis we will be updating to visulize the optimization in progress
 
-    n_points = 3  # Int: number of new observation points to place to increase coverage
+    n_points = 3  # Int: number of new observation points to place to increase coverage, these will be moved as we optimize
     polygon_method = "3d_poly"  # Two options: '3d_poly' (faster by about 8x) and  <removed for brevity>'3d_poly_with_obstructions' (more accurate, especially in complex terrain)
-    pt_height = 10  # Float or Int: Height of transmitter/ sensor - in map units, for ALL towers (including pre existing)
-    pt_max_radius = 35  # Float or Int: Maximum transmission/view distance from tower
+    pt_height = 5  # Float or Int: Height of transmitter/ sensor - in map units, for ALL towers (including pre existing)
+    pt_max_radius = 30  # Float or Int: Maximum transmission/view distance from tower
     pt_n_transects = 90  # Int: Number of rays (transects) cast to generate polygon - complex terrain at distance will require more rays, defaut 90 (4 degrees between rays). This can roughly be considered analogous to camera resolution
 
     obs_pts = visibility_optimized_points_3d(
