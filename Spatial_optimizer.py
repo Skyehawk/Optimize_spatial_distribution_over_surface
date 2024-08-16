@@ -207,7 +207,7 @@ def create_callback(method: str, kwargs):
                     dem,
                     fix_x,
                     fix_y,
-                    **kwargs,  # kwargs.get('obs_height'), kwargs.get('max_radius'), kwargs.get('num_transects')
+                    **kwargs,
                 )
                 fixed_polygons.append(fix_visible_area)
         else:
