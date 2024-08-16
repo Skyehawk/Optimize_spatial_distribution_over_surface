@@ -3,7 +3,7 @@
 # Syntax sugar stuff
 # Handle some function loading stuff for the optimizer
 from functools import partial
-from typing import List, Union
+from typing import Optional
 
 # Base imports
 import geopandas as gpd  # v 0.14.4
@@ -97,7 +97,7 @@ def get_visible_area_3d_poly(
     obs_y: int | float,
     obs_height: int | float,
     max_radius: int | float,
-    num_transects: int = 90,
+    num_transects: Optional[int] = 90,
 ) -> ShapelyPolygon:
     """
     Return a Shaply polygon based on a raytracing approach from an observation point.
@@ -234,7 +234,7 @@ def objective(
     surface: np.ndarray,
     valid_mask: np.ndarray,
     fixed_points: list[list[int | float]],
-    method: str = "3d_poly",
+    method: Optional[str] = "3d_poly",
     **kwargs,
 ) -> float:
     """
@@ -254,7 +254,7 @@ def objective(
     **kwargs      -- Additional arguments passed to through the fitness function (objective) to get_visible_area_3d_poly()
 
     Keyword Arguments:
-    method        -- String - (default 3d_poly) User defined function for calculating the visible area
+    method        -- String - (default 3d_poly) User defined function id for calculating the visible area
     """
     points = params.reshape(
         -1, 2
@@ -331,7 +331,7 @@ def visibility_optimized_points_3d(
     n_points             -- Int - Number of points to place/ optimize
     surface              -- Numpy ndarray - 2d float array of surface elevation
     valid_mask           -- Numpy ndarray  - 2d boolean array of the valid_mask cost surface
-    method               -- String - User defined method for calculating the visible area (e.g. "3d_poly")
+    method               -- String - User defined function id for calculating the visible area (e.g. "3d_poly")
     fixed_points         -- List(List(float,float)) - coordinate pairs of fixed observation points not allowed to change
     **kwargs             -- Additional arguments passed to through the fitness function (objective) to get_visible_area_3d_poly()
     """
@@ -371,12 +371,12 @@ def visibility_optimized_points_3d(
         init="halton",  # Several options avalible including: 'latinhypercube' (efficent) & 'sobol' (accurate)
         strategy="best1bin",  # Several options avalible. 'best1bin' is sufficent for most optimization
         maxiter=1000,  # Maximum number of iterations before ending
-        popsize=8,  # Multiplier of population size - impacted by initilization 5 - 15 has worked well
+        popsize=10,  # Multiplier of population size - impacted by initilization 5 - 15 has worked well
         tol=0.05,  # Tolerence threshold to stop iterating
         polish=True,  # Default true - polish with scipy.minimize
         workers=6,  # CPU cores to use
         updating="deferred",  # If "intermediate" - able to check for better solution within generation, "deferred" necessary if multiple worrkers
-        disp=True,  # return feedback on state of optimizer on terninal as it is running (iteration and score)
+        disp=True,  # Return feedback on state of optimizer on terninal as it is running (iteration and score)
         callback=callback_with_kwargs,  # (optional) callback function (above) for live updates as the optimizer runs
     )
 
@@ -397,7 +397,7 @@ def visibility_optimized_points_3d(
                 surface,
                 fix_x,
                 fix_y,
-                **kwargs,  # kwargs.get('obs_height'), kwargs.get('max_radius'), kwargs.get('num_transects')
+                **kwargs,
             )
             fixed_polygons.append(fix_visible_area)
     else:
@@ -413,16 +413,16 @@ if __name__ == "__main__":
     dem, valid_mask, x, y = generate_surface(dem_size)
     plot_generated_surface(dem, valid_mask)
 
-    # Fixed points that we will optimize other points, fixed points do not move
+    # Fixed points (y, x) that we will optimize other points, fixed points do not move
     fixed_points = np.array(
-        [[40, 30], [85, 70]]
+        [[5, 17], [85, 80]]
     )  # locations of pre-existing points (crds in float or int)
 
     fig_op, ax_op = plt.subplots(
         1, 1, figsize=(8, 6)
     )  # figure and axis we will be updating to visulize the optimization in progress
 
-    n_points = 3  # Int: number of new observation points to place to increase coverage, these will be moved as we optimize
+    n_points = 2  # Int: number of new observation points to place to increase coverage, these will be moved as we optimize
     polygon_method = "3d_poly"  # Two options: '3d_poly' (faster by about 8x) and  <removed for brevity>'3d_poly_with_obstructions' (more accurate, especially in complex terrain)
     pt_height = 5  # Float or Int: Height of transmitter/ sensor - in map units, for ALL towers (including pre existing)
     pt_max_radius = 30  # Float or Int: Maximum transmission/view distance from tower
