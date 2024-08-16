@@ -1,11 +1,16 @@
 # plot_functions.py
+from __future__ import annotations
+
+from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
-import plotly.graph_objects as go
+from matplotlib.axes import Axes
+
+# from shapely.geometry import Polygon as ShapelyPolygon
 
 
-def plot_generated_surface(surface, valid_mask):
+def plot_generated_surface(surface: np.ndarray, valid_mask: np.ndarray) -> None:
     """
     Return Matplotlib figure of the input arrays using imshow()
 
@@ -34,22 +39,18 @@ def plot_generated_surface(surface, valid_mask):
 
 
 def plot_observation_points_with_polygons_3d(
-    surface,
-    valid_mask,
-    observation_points,
-    fixed_points,
-    observation_polygons,
-    fixed_polygons,
-    annotation=None,
-    ax=None,
-):
-    if ax is not None and not isinstance(ax, plt.Axes):
-        raise TypeError(
-            "Expected None or a matplotlib Axes instance, but got type '{}'".format(
-                type(ax).__name__
-            )
-        )
+    surface: np.ndarray,
+    valid_mask: np.ndarray,
+    observation_points: list[list[int | float]],
+    fixed_points: list[list[int | float]],
+    observation_polygons: list[ShapelyPolygon],
+    fixed_polygons: list[ShapelyPolygon],
+    annotation: Optional[str] = None,
+    ax: Optional[Axes] = None,
+) -> None:
 
+    # Make some sort of figure with some defaults if none provided
+    # fig = None
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
     else:
