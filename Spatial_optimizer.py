@@ -1,7 +1,8 @@
 # Spatial_optimizer.py
-
+# Syntax sugar stuff
 # Handle some function loading stuff for the optimizer
 from functools import partial
+from typing import List, Union
 
 # Base imports
 import geopandas as gpd  # v 0.14.4
@@ -14,6 +15,7 @@ from IPython.display import clear_output
 # Scipy imports for spatial optimization
 from scipy.ndimage import gaussian_filter  # Smoothing - v 1.13.0
 from scipy.optimize import differential_evolution  # v 1.13.0
+from scipy.optimize.nonlin import scipy
 
 # Shapely imports for polygon handling and unions
 from shapely.geometry import Polygon as ShapelyPolygon
@@ -26,7 +28,7 @@ from plotting_utils import (
 )
 
 
-def generate_surface(map_size=100):
+def generate_surface(map_size: int = 100):
     """
     Return a square test dataset (surface), valid areas, and coordinates in the form of numpy arrays.
     The resultant test data somewhat mimics real-world terrain.
@@ -89,8 +91,13 @@ def generate_surface(map_size=100):
 
 
 def get_visible_area_3d_poly(
-    surface, obs_x, obs_y, obs_height, max_radius, num_transects=90
-):
+    surface: np.ndarray,
+    obs_x: int | float,
+    obs_y: int | float,
+    obs_height: int | float,
+    max_radius: int | float,
+    num_transects: int = 90,
+) -> ShapelyPolygon:
     """
     Return a Shaply polygon based on a raytracing approach from an observation point.
     Polygon in based on num_transects and a max distance. line of sight is
@@ -158,12 +165,12 @@ def get_visible_area_3d_poly(
     return polygon
 
 
-def create_callback(method, kwargs):
+def create_callback(method: str, kwargs):
     """
     Returns a callback function with access to the kwargs via closure
     """
 
-    def callback(intermediate_result):
+    def callback(intermediate_result: scipy.optimize.OptimizeResult) -> None:
         """
         Plot the current best solution of the optimizer thus far. Callback is purely
         for progrss and visulization, not necessary for core functionality.
@@ -222,13 +229,13 @@ def create_callback(method, kwargs):
 
 
 def objective(
-    params,
-    surface,
-    valid_mask,
-    fixed_points,
-    method="3d_poly",
+    params: np.ndarray,
+    surface: np.ndarray,
+    valid_mask: np.ndarray,
+    fixed_points: list[list[int | float]],
+    method: str = "3d_poly",
     **kwargs,
-):
+) -> float:
     """
     Return the score of the current solution. Used as the fitness function for
     differential_evolution
@@ -300,13 +307,18 @@ def objective(
 
 
 def visibility_optimized_points_3d(
-    surface,
-    valid_mask,
-    n_points,
-    method,
-    fixed_points,
+    surface: np.ndarray,
+    valid_mask: np.ndarray,
+    n_points: int,
+    method: str,
+    fixed_points: list[list[int | float]],
     **kwargs,
-):
+) -> tuple[
+    list[list[int | float]],
+    list[list[int | float]],
+    list[ShapelyPolygon],
+    list[ShapelyPolygon],
+]:
     """
     Return:
     observation_points   -- List(List(Int, Int)) - found optimized points coordinates, float or int
