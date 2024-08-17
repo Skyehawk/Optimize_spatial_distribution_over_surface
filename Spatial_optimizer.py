@@ -28,8 +28,8 @@ from plotting_utils import (
     plot_observation_points_with_polygons_3d,
 )
 
-
 def generate_surface(map_size: int = 100):
+
     """
     Return a square test dataset (surface), valid areas, and coordinates in the form of numpy arrays.
     The resultant test data somewhat mimics real-world terrain.
@@ -99,6 +99,7 @@ def get_visible_area_3d_poly(
     max_radius: int | float,
     num_transects: Optional[int] = 90,
 ) -> ShapelyPolygon:
+
     """
     Return a Shaply polygon based on a raytracing approach from an observation point.
     Polygon in based on num_transects and a max distance. line of sight is
@@ -166,12 +167,15 @@ def get_visible_area_3d_poly(
     return polygon
 
 
+
 def create_callback(method: str, kwargs):
+
     """
     Returns a callback function with access to the kwargs via closure
     """
 
     def callback(intermediate_result: scipy.optimize.OptimizeResult) -> None:
+
         """
         Plot the current best solution of the optimizer thus far. Callback is purely
         for progrss and visulization, not necessary for core functionality.
@@ -237,6 +241,7 @@ def objective(
     method: Optional[str] = "3d_poly",
     **kwargs,
 ) -> float:
+
     """
     Return the score of the current solution. Used as the fitness function for
     differential_evolution
@@ -320,6 +325,7 @@ def visibility_optimized_points_3d(
     list[ShapelyPolygon],
     list[ShapelyPolygon],
 ]:
+
     """
     Return:
     observation_points   -- Found optimized points coordinates, float or int
