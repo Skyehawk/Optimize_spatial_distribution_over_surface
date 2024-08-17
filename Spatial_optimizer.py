@@ -1,4 +1,5 @@
 # Spatial_optimizer.py
+from __future__ import annotations
 
 # Syntax sugar stuff
 # Handle some function loading stuff for the optimizer
@@ -16,7 +17,6 @@ from IPython.display import clear_output
 # Scipy imports for spatial optimization
 from scipy.ndimage import gaussian_filter  # Smoothing - v 1.13.0
 from scipy.optimize import differential_evolution  # v 1.13.0
-from scipy.optimize.nonlin import scipy
 
 # Shapely imports for polygon handling and unions
 from shapely.geometry import Polygon as ShapelyPolygon
@@ -35,7 +35,7 @@ def generate_surface(map_size: int = 100):
     The resultant test data somewhat mimics real-world terrain.
 
     Keyword arguments:
-    map_size -- Int - (defaut 100) size of the x and y dimension of the test data
+    map_size -- size of the x AND y dimension of the test data
     """
 
     # Generate structured surface data coordinates, named xx & yy by convention
@@ -105,11 +105,11 @@ def get_visible_area_3d_poly(
     calculated by sweeping a 0 degrees elevation (i.e. laser level approach)
 
     Arguments:
-    surface    -- Numpy ndarray - surface surface, 2d array of elevation values
-    obs_x      -- Float - x coordinate in surface crds
-    obs_y      -- Float - y coordinate in surface crds
-    obs_height -- Float - additional "tower" height above the surface at (obs_x, obs_y)
-    max_radius -- Float - maximum distance a transect (ray) is cast, whereafter the max radius will be assumed
+    surface    -- surface surface, 2d array of elevation values
+    obs_x      -- x coordinate in surface crds
+    obs_y      -- y coordinate in surface crds
+    obs_height -- additional "tower" height above the surface at (obs_x, obs_y)
+    max_radius -- maximum distance a transect (ray) is cast, whereafter the max radius will be assumed
 
     Keyword Arguments:
     num_transects -- Int -- (default 90) number of instances to be checked, divided over 360 degrees
@@ -127,7 +127,7 @@ def get_visible_area_3d_poly(
         dy = np.sin(angle)
         obs_elevation = surface[
             int(np.round(obs_x)), int(np.round(obs_y))
-        ]  # Convert to integers
+        ]  # Convert to integers for approximaton
 
         max_distance = 0
         max_x, max_y = obs_x, obs_y
@@ -177,7 +177,7 @@ def create_callback(method: str, kwargs):
         for progrss and visulization, not necessary for core functionality.
 
         Arguments:
-        intermediate_result -- Scipy.optimize.OptimizeResult - supplied by differential_evolution
+        intermediate_result -- Supplied by differential_evolution
         """
         # Extract current best solution coordinates to a listkl:w
 
@@ -245,16 +245,16 @@ def objective(
     - 2) Map coverage - we desire high coverage for the given n points (what we are optimizing for)
 
     Arguments:
-    params        -- Numpy ndarray - A 1D array containing the x and y coordinates of
+    params        -- A 1D array containing the x and y coordinates of
                      the points being optimized as determined by differential_evolution,
                      THIS IS SUPPLIED BY differential_evolution (initially derived ferom bounds)
-    surface       -- Numpy ndarray - 2d float array of surface elevation
-    valid_mask    -- Numpy ndarray  - 2d boolean array of the valid_mask cost surface
-    fixed_points  -- List(List(float,float)) - coordinate pairs of fixed observation points not allowed to change
+    surface       -- 2d float array of surface elevation
+    valid_mask    -- 2d boolean array of the valid_mask cost surface
+    fixed_points  -- Coordinate pairs of fixed observation points not allowed to change
     **kwargs      -- Additional arguments passed to through the fitness function (objective) to get_visible_area_3d_poly()
 
     Keyword Arguments:
-    method        -- String - (default 3d_poly) User defined function id for calculating the visible area
+    method        -- User defined function id for calculating the visible area
     """
     points = params.reshape(
         -1, 2
@@ -322,17 +322,17 @@ def visibility_optimized_points_3d(
 ]:
     """
     Return:
-    observation_points   -- List(List(Int, Int)) - found optimized points coordinates, float or int
-    fixed_points         -- List(List(Int, Int)) - fixed point coordinates, as we passed in, float or int
-    observation_polygons -- List(ShapelyPolygon) - visibility coverage polygon for optimized points
-    fixed_polygons       -- List(ShapelyPolygon) - Same as observation_polygons, but for fixed points
+    observation_points   -- Found optimized points coordinates, float or int
+    fixed_points         -- Fixed point coordinates, as we passed in, float or int
+    observation_polygons -- Visibility coverage polygon for optimized points
+    fixed_polygons       -- Same as observation_polygons, but for fixed points
 
     Arguments:
-    n_points             -- Int - Number of points to place/ optimize
-    surface              -- Numpy ndarray - 2d float array of surface elevation
-    valid_mask           -- Numpy ndarray  - 2d boolean array of the valid_mask cost surface
-    method               -- String - User defined function id for calculating the visible area (e.g. "3d_poly")
-    fixed_points         -- List(List(float,float)) - coordinate pairs of fixed observation points not allowed to change
+    n_points             -- Number of points to place/ optimize
+    surface              -- 2d float array of surface elevation
+    valid_mask           -- 2d boolean array of the valid_mask cost surface
+    method               -- User defined function id for calculating the visible area (e.g. "3d_poly")
+    fixed_points         -- Coordinate pairs of fixed observation points not allowed to change
     **kwargs             -- Additional arguments passed to through the fitness function (objective) to get_visible_area_3d_poly()
     """
 
