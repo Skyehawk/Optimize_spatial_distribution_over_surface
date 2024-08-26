@@ -47,6 +47,8 @@ The spatial optimizer solves the problem of determining the best observation poi
 
 ## Usage
 
+The Spatial_optimizer.py script contains the necessary finction calls to execute out-of-the-box. However, I will highlight a few key areas within the code here (the major finction calls) if you chose to import instead of running standalone.
+
 ### Generating Test Surface
 
 You can generate a synthetic surface using the `generate_surface` function. This surface mimics real-world terrain and includes both valid and invalid areas (e.g., cliffs, lakes).
