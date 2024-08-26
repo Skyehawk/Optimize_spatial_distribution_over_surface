@@ -29,7 +29,7 @@ The spatial optimizer solves the problem of determining the best observation poi
 
 1. Clone the repository:
     ```bash
-    git clone https://github.com/yourusername/spatial_optimizer.git
+    git clone https://github.com/Skyehawk/spatial_optimizer.git
     cd spatial_optimizer
     ```
 
