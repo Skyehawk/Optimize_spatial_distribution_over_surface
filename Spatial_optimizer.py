@@ -1,32 +1,42 @@
+#!/home/skye/miniconda3/envs/Spatial_stats/bin/python
+"""
+This module provides driver and functionality for Spatial optimization of points
+on a surface for line-of-sight placement, respecting user blackout (bounds)
+areas and terrain obstructions.
+
+"""
+
 # Spatial_optimizer.py
+# Author: Skye Leake
+# Last Updated: 08-28-2024
+# 
+# Provided under the MIT OpenSource License
+
+
 from __future__ import annotations
 
 # Syntax sugar stuff
 # Handle some function loading stuff for the optimizer
 from functools import partial
-from typing import Optional
+from typing import \
+    Optional  # Typing has slowly been depreicated since Python 3.9, swap to collections.abc
 
 # Base imports
 import geopandas as gpd  # v 0.14.4
 import matplotlib.pyplot as plt  # Visulization - v 3.8.4
 import numpy as np  # Array manipulation - v 1.26.4
-
 # Visulization libs outside of mpl
 from IPython.display import clear_output
-
 # Scipy imports for spatial optimization
 from scipy.ndimage import gaussian_filter  # Smoothing - v 1.13.0
 from scipy.optimize import differential_evolution  # v 1.13.0
-
 # Shapely imports for polygon handling and unions
 from shapely.geometry import Polygon as ShapelyPolygon
 from shapely.ops import unary_union
 
 # Import all of our plotting functions from ploting_utils.py, these take up a LOT of lines, moved for readability
-from plotting_utils import (
-    plot_generated_surface,
-    plot_observation_points_with_polygons_3d,
-)
+from plotting_utils import (plot_generated_surface,
+                            plot_observation_points_with_polygons_3d)
 
 def generate_surface(map_size: int = 100):
 
@@ -411,7 +421,8 @@ def visibility_optimized_points_3d(
             "Invalid method specified. Must be one of: '3d_poly','3d_poly_with_obstructions'"
         )
 
-    return observation_points, fixed_points, observation_polygons, fixed_polygons
+    return observation_points, fixed_points, observation_polygons, fixed_polygons
+
 
 
 if __name__ == "__main__":
