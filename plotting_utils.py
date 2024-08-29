@@ -1,7 +1,14 @@
+# Author: Skye Leake
+# Last Updated: 08-28-2024
+#
+# Provided under the MIT OpenSource License
+
 # plot_functions.py
+
+
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional  # Deprecated in Python 3.9, need to swap to collections.abc
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,7 +19,7 @@ from matplotlib.axes import Axes
 
 def plot_generated_surface(surface: np.ndarray, valid_mask: np.ndarray) -> None:
     """
-    Return Matplotlib figure of the input arrays using imshow()
+    Create a Matplotlib figure of the input arrays using imshow()
 
     Arguments:
     surface        -- Numpy ndarray - representing the surface (2 dimesional)
@@ -48,7 +55,9 @@ def plot_observation_points_with_polygons_3d(
     annotation: Optional[str] = None,
     ax: Optional[Axes] = None,
 ) -> None:
-
+    """
+    Create a Matplotlib figure with visible area polygons
+    """
     # Make some sort of figure with some defaults if none provided
     # fig = None
     if ax is None:
@@ -153,7 +162,8 @@ def plot_observation_points_with_polygons_3d(
         )
 
     if isinstance(annotation, str):
-        # Add annotation at the bottom center
+        # Add annotation at the bottom center, used for callback functionality to
+        # see progress as optimizer runs
         ax.annotate(
             annotation,
             xy=(0.5, 0),
